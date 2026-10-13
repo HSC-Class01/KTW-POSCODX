@@ -3,7 +3,7 @@ from pathlib import Path
 import requests
 import pandas as pd
 
-BASE = Path(__file__).resolve().parents[1]
+BASE = Path(__file__).resolve().parent
 CONFIG = json.loads((BASE / "config.json").read_text(encoding="utf-8"))
 API_KEY = os.getenv("DART_API_KEY")
 if not API_KEY:
