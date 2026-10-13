@@ -10,60 +10,52 @@ body{font-family:Arial,sans-serif;margin:0;background:#f5f7fb;color:#172033}
 header{padding:28px 6%;background:#172033;color:white}
 main{max-width:1200px;margin:24px auto;padding:0 18px}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px}
-.card{background:white;border-radius:14px;padding:20px;box-shadow:0 2px 10px #00000012}
-.kpi{font-size:28px;font-weight:700;margin-top:8px}
-.chart{height:330px;margin-top:16px}
-table{width:100%;border-collapse:collapse;background:white}
-th,td{padding:10px;border-bottom:1px solid #e5e7eb;text-align:right}
+.card{background:white;border-radius:14px;padding:20px;box-shadow:0 2px 10px #00000012;min-width:0}
+.kpi{font-size:clamp(20px,3vw,28px);font-weight:700;margin-top:8px;overflow-wrap:anywhere}
+.chart{height:330px;margin-top:16px;position:relative}
+table{width:100%;border-collapse:collapse;background:white;min-width:760px}
+th,td{padding:10px;border-bottom:1px solid #e5e7eb;text-align:right;white-space:nowrap}
 th:first-child,td:first-child{text-align:left}
 .note{font-size:13px;color:#667085}
+.error{border-left:4px solid #b42318;color:#7a271a;background:#fff5f5;padding:16px;border-radius:8px;margin-bottom:16px;overflow-wrap:anywhere}
+@media(max-width:600px){header{padding:20px 5%}main{padding:0 12px}.chart{height:280px}.card{padding:14px}}
 </style>
 </head>
 <body>
 <header><h1>포스코DX DART 재무분석</h1><div>사업보고서 · 반기보고서 · 분기보고서 | 자동 업데이트</div></header>
 <main>
+<div id="status" role="status" aria-live="polite"></div>
 <section class="grid" id="kpis"></section>
 <div class="card chart"><canvas id="profitChart"></canvas></div>
 <div class="card chart"><canvas id="ratioChart"></canvas></div>
 <div class="card chart"><canvas id="growthChart"></canvas></div>
 <div class="card"><h2>연도별 주요 재무수치</h2><div style="overflow:auto"><table id="table"></table></div></div>
-<p class="note">자료: 금융감독원 DART/OpenDART. 수치는 API 응답과 회사 공시 기준이며, 보고서 유형·연결/별도 기준에 따라 차이가 발생할 수 있습니다.</p>
+<p class="note">자료: 금융감독원 DART/OpenDART. 수치는 API 응답과 회사 공시 기준이며, 보고서 유형·연결/별도 기준에 따라 차이가 발생할 수 있습니다. 값이 없는 항목은 임의로 0으로 처리하지 않습니다.</p>
 </main>
 <script>
+const fmt=v=>v==null||v===""||!Number.isFinite(Number(v))?"-":Number(v).toLocaleString("ko-KR",{maximumFractionDigits:2});
+const numeric=v=>v==null||v===""||!Number.isFinite(Number(v))?null:Number(v);
+const status=document.getElementById("status");
+function showError(message){status.innerHTML="";const box=document.createElement("div");box.className="error";box.textContent=message;status.appendChild(box);}
+function drawChart(id,labels,datasets,title){const el=document.getElementById(id);if(!el)return;new Chart(el,{type:"line",data:{labels,datasets:datasets.map(s=>({...s,data:s.data.map(numeric),spanGaps:true}))},options:{responsive:true,maintainAspectRatio:false,plugins:{title:{display:true,text:title}},interaction:{mode:"index",intersect:false},scales:{y:{beginAtZero:false}}}});}
 async function load(){
- const r=await fetch('../data/processed/dashboard_data.json?ts='+Date.now());
- const d=await r.json();
- const a=d.annual||[];
- const years=a.map(x=>x.year);
- const latest=a[a.length-1]||{};
- const fmt=v=>v==null||v===""?"-":Number(v).toLocaleString("ko-KR",{maximumFractionDigits:2});
- const cards=[
-  ["최근 매출액",latest["매출액"]],
-  ["최근 영업이익",latest["영업이익"]],
-  ["최근 당기순이익",latest["당기순이익"]],
-  ["최근 부채비율",latest["부채비율"]==null?null:fmt(latest["부채비율"])+"%"]
- ];
- document.getElementById("kpis").innerHTML=cards.map(x=>`<div class="card"><div>${x[0]}</div><div class="kpi">${typeof x[1]==="string"&&x[1].endsWith("%")?x[1]:fmt(x[1])}</div></div>`).join("");
- new Chart(document.getElementById("profitChart"),{type:"line",data:{labels:years,datasets:[
-  {label:"매출액",data:a.map(x=>x["매출액"])},
-  {label:"영업이익",data:a.map(x=>x["영업이익"])},
-  {label:"당기순이익",data:a.map(x=>x["당기순이익"])}
- ]},options:{responsive:true,maintainAspectRatio:false,plugins:{title:{display:true,text:"주요 손익 추이"}}}});
- new Chart(document.getElementById("ratioChart"),{type:"line",data:{labels:years,datasets:[
-  {label:"ROA",data:a.map(x=>x["ROA"])},
-  {label:"ROE",data:a.map(x=>x["ROE"])},
-  {label:"영업이익률",data:a.map(x=>x["영업이익률"])},
-  {label:"순이익률",data:a.map(x=>x["순이익률"])}
- ]},options:{responsive:true,maintainAspectRatio:false,plugins:{title:{display:true,text:"수익성 지표 (%)"}}}});
- new Chart(document.getElementById("growthChart"),{type:"line",data:{labels:years,datasets:[
-  {label:"매출액 증가율",data:a.map(x=>x["매출액증가율"])},
-  {label:"영업이익 증가율",data:a.map(x=>x["영업이익증가율"])},
-  {label:"당기순이익 증가율",data:a.map(x=>x["당기순이익증가율"])}
- ]},options:{responsive:true,maintainAspectRatio:false,plugins:{title:{display:true,text:"성장성 지표 (%)"}}}});
- const cols=["year","매출액","영업이익","당기순이익","자산총계","부채총계","자본총계","부채비율","유동비율","ROA","ROE"];
- document.getElementById("table").innerHTML="<thead><tr>"+cols.map(c=>`<th>${c}</th>`).join("")+"</tr></thead><tbody>"+
- a.map(x=>"<tr>"+cols.map(c=>`<td>${c==="year"?x[c]:fmt(x[c])}</td>`).join("")+"</tr>").join("")+"</tbody>";
+  // This page is hosted at the repository root, so data paths must be root-relative.
+  const candidates=["./data/processed/dashboard_data.json","./data/dashboard_data.json"];
+  let d=null,lastError=null,loadedPath="";
+  for(const path of candidates){try{const response=await fetch(path+"?ts="+Date.now(),{cache:"no-store"});if(!response.ok)throw new Error(path+" returned HTTP "+response.status);const json=await response.json();if(!json||!Array.isArray(json.annual))throw new Error(path+" does not contain an annual array");d=json;loadedPath=path;break;}catch(e){lastError=e;}}
+  if(!d){showError("재무 데이터 파일을 불러오지 못했습니다. 대시보드는 저장소 루트 기준으로 data/processed/dashboard_data.json 또는 data/dashboard_data.json 파일을 찾습니다. 데이터 생성 작업이 실행되었는지, 파일이 저장소에 커밋되었는지, GitHub Pages 배포 설정을 확인해주세요. 상세 오류: "+(lastError?lastError.message:"알 수 없는 오류"));return;}
+  const a=d.annual.filter(x=>x&&x.year!=null).sort((x,y)=>Number(x.year)-Number(y.year));
+  if(!a.length){showError("데이터 파일은 읽었지만 연도별 재무 데이터가 비어 있습니다. DART 수집·분석 작업의 결과를 확인해주세요.");return;}
+  status.textContent="데이터 로드 완료 ("+loadedPath+") · "+a.length+"개 연도";
+  const years=a.map(x=>x.year),latest=a[a.length-1];
+  const cards=[["최근 매출액",latest["매출액"]],["최근 영업이익",latest["영업이익"]],["최근 당기순이익",latest["당기순이익"]],["최근 부채비율",numeric(latest["부채비율"])===null?null:fmt(latest["부채비율"])+"%"]];
+  document.getElementById("kpis").innerHTML=cards.map(x=>'<div class="card"><div>'+x[0]+'</div><div class="kpi">'+(typeof x[1]==="string"&&x[1].endsWith("%")?x[1]:fmt(x[1]))+'</div></div>').join("");
+  drawChart("profitChart",years,[{label:"매출액",data:a.map(x=>x["매출액"])},{label:"영업이익",data:a.map(x=>x["영업이익"])},{label:"당기순이익",data:a.map(x=>x["당기순이익"])}],"주요 손익 추이");
+  drawChart("ratioChart",years,[{label:"ROA",data:a.map(x=>x["ROA"])},{label:"ROE",data:a.map(x=>x["ROE"])},{label:"영업이익률",data:a.map(x=>x["영업이익률"])},{label:"순이익률",data:a.map(x=>x["순이익률"])}],"수익성 지표 (%)");
+  drawChart("growthChart",years,[{label:"매출액 증가율",data:a.map(x=>x["매출액증가율"])},{label:"영업이익 증가율",data:a.map(x=>x["영업이익증가율"])},{label:"당기순이익 증가율",data:a.map(x=>x["당기순이익증가율"])}],"성장성 지표 (%)");
+  const cols=["year","매출액","영업이익","당기순이익","자산총계","부채총계","자본총계","부채비율","유동비율","ROA","ROE"];
+  document.getElementById("table").innerHTML="<thead><tr>"+cols.map(c=>"<th>"+c+"</th>").join("")+"</tr></thead><tbody>"+a.map(x=>"<tr>"+cols.map(c=>"<td>"+(c==="year"?x[c]:fmt(x[c]))+"</td>").join("")+"</tr>").join("")+"</tbody>";
 }
-load().catch(e=>document.querySelector("main").insertAdjacentHTML("afterbegin",`<div class="card">데이터 로딩 실패: ${e}</div>`));
+load().catch(e=>showError("대시보드 실행 중 오류가 발생했습니다: "+e.message));
 </script>
 </body></html>
