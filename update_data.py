@@ -68,17 +68,22 @@ def collect_report_list(corp_code):
             },
         )
         for x in data.get("list", []):
-            detail = x.get("pblntf_detail_ty")
-            # list.json uses A001/A002/A003, while the financial statement API
-            # uses 11011/11012/11013/11014.
-            report_code = {"A001": "11011", "A002": "11012"}.get(detail)
-            if detail == "A003":
-                period_match = re.search(r"\((\d{4})\.(\d{2})\)", x.get("report_nm", ""))
+            report_nm = str(x.get("report_nm") or "")
+            # list.json returns the report name; normalize it to the financial
+            # statement API's report codes (11011/11012/11013/11014).
+            if "사업보고서" in report_nm:
+                report_code = "11011"
+            elif "반기보고서" in report_nm:
+                report_code = "11012"
+            elif "분기보고서" in report_nm:
+                period_match = re.search(r"\((\d{4})\.(\d{2})\)", report_nm)
                 period_month = int(period_match.group(2)) if period_match else 0
                 if not period_month:
                     rcept_dt = str(x.get("rcept_dt", ""))
                     period_month = int(rcept_dt[4:6]) if len(rcept_dt) >= 6 else 0
                 report_code = "11013" if 1 <= period_month <= 6 else "11014" if 7 <= period_month <= 12 else None
+            else:
+                report_code = None
             if report_code in REPORTS:
                 rows.append({
                     "year": year,
@@ -86,7 +91,7 @@ def collect_report_list(corp_code):
                     "report_code": report_code,
                     "rcept_no": x.get("rcept_no"),
                     "rcept_dt": x.get("rcept_dt"),
-                    "report_nm": x.get("report_nm"),
+                    "report_nm": report_nm,
                     "corp_name": x.get("corp_name"),
                 })
         time.sleep(0.15)
