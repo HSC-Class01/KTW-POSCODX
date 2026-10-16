@@ -1,4 +1,4 @@
-import os, io, zipfile, json, time
+import os, io, zipfile, json, time, re
 from pathlib import Path
 import requests
 import pandas as pd
@@ -69,11 +69,21 @@ def collect_report_list(corp_code):
         )
         for x in data.get("list", []):
             detail = x.get("pblntf_detail_ty")
-            if detail in REPORTS:
+            # list.json uses A001/A002/A003, while the financial statement API
+            # uses 11011/11012/11013/11014.
+            report_code = {"A001": "11011", "A002": "11012"}.get(detail)
+            if detail == "A003":
+                period_match = re.search(r"\((\d{4})\.(\d{2})\)", x.get("report_nm", ""))
+                period_month = int(period_match.group(2)) if period_match else 0
+                if not period_month:
+                    rcept_dt = str(x.get("rcept_dt", ""))
+                    period_month = int(rcept_dt[4:6]) if len(rcept_dt) >= 6 else 0
+                report_code = "11013" if 1 <= period_month <= 6 else "11014" if 7 <= period_month <= 12 else None
+            if report_code in REPORTS:
                 rows.append({
                     "year": year,
-                    "report_name": REPORTS[detail],
-                    "report_code": detail,
+                    "report_name": REPORTS[report_code],
+                    "report_code": report_code,
                     "rcept_no": x.get("rcept_no"),
                     "rcept_dt": x.get("rcept_dt"),
                     "report_nm": x.get("report_nm"),
@@ -122,7 +132,6 @@ def collect_financials(corp_code):
     return pd.DataFrame(rows)
 
 if __name__ == "__main__":
-    import re
     corp_code = get_corp_code()
     print("corp_code:", corp_code)
 
