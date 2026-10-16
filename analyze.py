@@ -91,12 +91,12 @@ out.to_csv(OUT / "all_report_analysis.csv", index=False, encoding="utf-8-sig")
 payload = {
     "company": "포스코DX",
     "updated_at": pd.Timestamp.utcnow().isoformat(),
-    "annual": annual.where(pd.notna(annual), None).to_dict(orient="records"),
+    "annual": annual.astype(object).where(pd.notna(annual), None).to_dict(orient="records"),
     "metrics": list(METRICS.keys()),
     "ratios": ["영업이익률","순이익률","ROA","ROE","부채비율","자기자본비율","유동비율",
                "매출액증가율","영업이익증가율","당기순이익증가율","총자산회전율"]
 }
 (OUT / "dashboard_data.json").write_text(
-    json.dumps(payload, ensure_ascii=False, indent=2, default=str), encoding="utf-8"
+    json.dumps(payload, ensure_ascii=False, indent=2, default=str, allow_nan=False), encoding="utf-8"
 )
 print("분석 완료:", OUT / "annual_analysis.csv")
